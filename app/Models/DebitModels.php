@@ -16,6 +16,6 @@ class DebitModels extends Model
         'jasa', 'parts', 'bahan', 'OPL', 'OPB',
         'kode_jasa', 'kode_parts', 'kode_bahan',
         'kode_opl', 'kode_opb', 'ppn', 'kode_ppn',
-        'total', 'wo'
+        'total', 'kode_total', 'wo'
     ];
 }

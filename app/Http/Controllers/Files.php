@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DebitModels;
 use App\Models\KreditModels;
 use App\Models\PKBModels;
 use Illuminate\Http\Request;
@@ -67,10 +68,50 @@ class Files extends Controller
                 'kode_bahan' => $kodeBahan,
                 'kode_opl'   => $kodeOPL,
                 'kode_opb'   => $kodeOPB,
-                'wo'         => $data[$row][1]
+                'wo'         => $wo
             ];
 
             KreditModels::updateOrCreate($kredit);
+
+            # Insert Debit
+            $discJasa  = $data[$row][21];
+            $discParts = $data[$row][24];
+            $discBahan = $data[$row][27];
+            $discOPL   = $data[$row][30];
+            $discOPB   = $data[$row][33];
+            $ppn       = $data[$row][36];
+            $total     = $data[$row][38];
+
+            $kodeDiscJasa  = $data[$row][22];
+            $kodeDiscPart  = $data[$row][25];
+            $kodeDiscBahan = $data[$row][28];
+            $kodeDiscOPL   = $data[$row][31];
+            $kodeDiscOPB   = $data[$row][34];
+            $kodePPN       = $data[$row][37];
+            $kodeTotal     = $data[$row][39];
+
+            $debit = [
+                'jasa'       => $discJasa,
+                'parts'      => $discParts,
+                'bahan'      => $discBahan,
+                'OPL'        => $discOPL,
+                'OPB'        => $discOPB,
+                'kode_jasa'  => $kodeDiscJasa,
+                'kode_parts' => $kodeDiscPart,
+                'kode_bahan' => $kodeDiscBahan,
+                'kode_opl'   => $kodeDiscOPL,
+                'kode_opb'   => $kodeDiscOPB,
+                'ppn'        => $ppn,
+                'kode_ppn'   => $kodePPN,
+                'total'      => $total,
+                'kode_total' => $kodeTotal,
+                'wo'         => $wo
+            ];
+
+            DebitModels::updateOrCreate($debit);
+
+            session()->flash('pesan', 'Data penjualan berhasil di upload');
+            return redirect()->to(session()->previousUrl());
         }
     }
 }

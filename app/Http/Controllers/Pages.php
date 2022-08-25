@@ -10,4 +10,11 @@ class Pages extends Controller
         $items['nav']   = 'home';
         return view('pages.dashboard', $items);
     }
+
+    function report()
+    {
+        $components['title'] = "Report";
+        $components['nav']   = "report";
+        return view('pages.report', $components);
+    }
 }

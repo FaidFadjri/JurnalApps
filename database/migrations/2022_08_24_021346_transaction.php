@@ -72,6 +72,7 @@ class Transaction extends Migration
             $table->integer('ppn');
             $table->string('kode_ppn');
             $table->string('total');
+            $table->string('kode_total');
             $table->string('wo');
             $table->dateTime('created_at');
             $table->dateTime('updated_at');

@@ -15,24 +15,17 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+//--- Main apps
 Route::get('/', [Pages::class, 'index']);
+Route::get('report', [Pages::class, 'report']);
 
+//---- Datatables
+// Route::get('/l')
 
-
-
-//---- Form Routes
+//---- Routes Form
 Route::post('import', [Files::class, '_import']);
 
-
 //---- Direct to views
-Route::prefix('/')->group(function () {
-    Route::get('login', function () {
-        return view('auth.login');
-    });
-
-    Route::get('report', function () {
-        $components['title'] = "Report";
-        $components['nav']   = "report";
-        return view('pages.report', $components);
-    });
+Route::get('login', function () {
+    return view('auth.login');
 });

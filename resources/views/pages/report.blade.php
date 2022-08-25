@@ -4,10 +4,22 @@
     <link rel="stylesheet" href="/css/report/style.css">
 
     <div class="container mt-5">
+        @if (Session::has('pesan'))
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <strong>Selamat!</strong> {{ Session::get('pesan') }}.
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
         <div class="row">
             <div class="col-12">
-                <button class="btn btn-primary float-right d-flex align-items-center shadow modal-button" data-toggle="modal"
-                    data-target="#importModal">
+                <button class="btn btn-primary float-right d-flex align-items-center shadow modal-button"
+                    data-toggle="modal" data-target="#importModal">
                     Import
                     <ion-icon name="cloud-download" class="ml-2"></ion-icon>
                 </button>
