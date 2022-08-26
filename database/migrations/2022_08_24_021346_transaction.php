@@ -31,13 +31,12 @@ class Transaction extends Migration
             $table->string('wo');
             $table->string('license_plate');
             $table->string('customer');
-            $table->dateTime('invoice_date');
             $table->dateTime('created_at');
             $table->dateTime('updated_at');
         });
 
         //---- Tabel Kredit
-        Schema::create('transaction_kredit', function (Blueprint $table) {
+        Schema::create('transaction_detail', function (Blueprint $table) {
             $table->engine = 'InnoDB'; // <- add this
             $table->id()->autoIncrement();
             $table->integer('jasa');
@@ -50,30 +49,26 @@ class Transaction extends Migration
             $table->string('kode_bahan');
             $table->string('kode_opl');
             $table->string('kode_opb');
-            $table->string('wo');
-            $table->dateTime('created_at');
-            $table->dateTime('updated_at');
-        });
 
-        // Table Debit
-        Schema::create('transaction_debit', function (Blueprint $table) {
-            $table->engine = 'InnoDB'; // <- add this
-            $table->id()->autoIncrement();
-            $table->integer('jasa');
-            $table->integer('parts');
-            $table->integer('bahan');
-            $table->integer('OPL');
-            $table->integer('OPB');
-            $table->string('kode_jasa');
-            $table->string('kode_parts');
-            $table->string('kode_bahan');
-            $table->string('kode_opl');
-            $table->string('kode_opb');
+
+            //---- Discount Column
+            $table->integer('discJasa');
+            $table->integer('discParts');
+            $table->integer('discBahan');
+            $table->integer('discOPL');
+            $table->integer('discOPB');
+            $table->string('kode_discJasa');
+            $table->string('kode_discParts');
+            $table->string('kode_discBahan');
+            $table->string('kode_discOpl');
+            $table->string('kode_discOpb');
             $table->integer('ppn');
             $table->string('kode_ppn');
             $table->string('total');
             $table->string('kode_total');
+
             $table->string('wo');
+            $table->date('invoice_date');
             $table->dateTime('created_at');
             $table->dateTime('updated_at');
         });
@@ -82,7 +77,6 @@ class Transaction extends Migration
     {
         Schema::drop('transaction_code');
         Schema::drop('transaction_pkb');
-        Schema::drop('transaction_kredit');
-        Schema::drop('transaction_debit');
+        Schema::drop('transaction_detail');
     }
 }

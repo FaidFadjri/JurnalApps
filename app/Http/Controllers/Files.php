@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DebitModels;
-use App\Models\KreditModels;
 use App\Models\PKBModels;
 use Illuminate\Http\Request;
+use App\Models\Transaction;
 
 class Files extends Controller
 {
@@ -32,10 +31,10 @@ class Files extends Controller
             $wo            = $data[$row][1];
             $license_plate = $data[$row][3];
             $customer      = $data[$row][4];
+            $invoiceDate   = date('Y-m-d', strtotime($data[$row][2]));
 
             $PKB = [
                 'wo'            => $wo,
-                'invoice_date'  => date('Y-m-d', strtotime($data[$row][2])),
                 'license_plate' => $license_plate,
                 'customer'      => $customer
             ];
@@ -57,22 +56,6 @@ class Files extends Controller
             $kodeOPL   = $data[$row][16];
             $kodeOPB   = $data[$row][19];
 
-            $kredit = [
-                'jasa'       => $netJasa,
-                'parts'      => $netParts,
-                'bahan'      => $netBahan,
-                'OPL'        => $netOPL,
-                'OPB'        => $netOPB,
-                'kode_jasa'  => $kodeJasa,
-                'kode_parts' => $kodePart,
-                'kode_bahan' => $kodeBahan,
-                'kode_opl'   => $kodeOPL,
-                'kode_opb'   => $kodeOPB,
-                'wo'         => $wo
-            ];
-
-            KreditModels::updateOrCreate($kredit);
-
             # Insert Debit
             $discJasa  = $data[$row][21];
             $discParts = $data[$row][24];
@@ -90,28 +73,62 @@ class Files extends Controller
             $kodePPN       = $data[$row][37];
             $kodeTotal     = $data[$row][39];
 
-            $debit = [
-                'jasa'       => $discJasa,
-                'parts'      => $discParts,
-                'bahan'      => $discBahan,
-                'OPL'        => $discOPL,
-                'OPB'        => $discOPB,
-                'kode_jasa'  => $kodeDiscJasa,
-                'kode_parts' => $kodeDiscPart,
-                'kode_bahan' => $kodeDiscBahan,
-                'kode_opl'   => $kodeDiscOPL,
-                'kode_opb'   => $kodeDiscOPB,
+            $detail = [
+                'jasa'         => $netJasa,
+                'parts'        => $netParts,
+                'bahan'        => $netBahan,
+                'OPL'          => $netOPL,
+                'OPB'          => $netOPB,
+                'kode_jasa'    => $kodeJasa,
+                'kode_parts'   => $kodePart,
+                'kode_bahan'   => $kodeBahan,
+                'kode_opl'     => $kodeOPL,
+                'kode_opb'     => $kodeOPB,
+
+                'discJasa'       => $discJasa,
+                'discParts'      => $discParts,
+                'discBahan'      => $discBahan,
+                'discOPL'        => $discOPL,
+                'discOPB'        => $discOPB,
+                'kode_discJasa'  => $kodeDiscJasa,
+                'kode_discParts' => $kodeDiscPart,
+                'kode_discBahan' => $kodeDiscBahan,
+                'kode_discOpl'   => $kodeDiscOPL,
+                'kode_discOpb'   => $kodeDiscOPB,
                 'ppn'        => $ppn,
                 'kode_ppn'   => $kodePPN,
                 'total'      => $total,
                 'kode_total' => $kodeTotal,
-                'wo'         => $wo
+
+                'wo'           => $wo,
+                'invoice_date' => $invoiceDate,
             ];
 
-            DebitModels::updateOrCreate($debit);
+            Transaction::updateOrCreate($detail);
 
-            session()->flash('pesan', 'Data penjualan berhasil di upload');
-            return redirect()->to(session()->previousUrl());
+
+
+
+            // $debit = [
+            //     'jasa'       => $discJasa,
+            //     'parts'      => $discParts,
+            //     'bahan'      => $discBahan,
+            //     'OPL'        => $discOPL,
+            //     'OPB'        => $discOPB,
+            //     'kode_jasa'  => $kodeDiscJasa,
+            //     'kode_parts' => $kodeDiscPart,
+            //     'kode_bahan' => $kodeDiscBahan,
+            //     'kode_opl'   => $kodeDiscOPL,
+            //     'kode_opb'   => $kodeDiscOPB,
+            //     'ppn'        => $ppn,
+            //     'kode_ppn'   => $kodePPN,
+            //     'total'      => $total,
+            //     'kode_total' => $kodeTotal,
+            //     'wo'         => $wo,
+            //     'invoice_date' => $invoiceDate
+            // ];
         }
+        session()->flash('pesan', 'Data penjualan berhasil di upload');
+        return redirect()->to(session()->previousUrl());
     }
 }

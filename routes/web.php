@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Pages;
 use App\Http\Controllers\Files;
+use App\Http\Controllers\Operation;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,7 +21,13 @@ Route::get('/', [Pages::class, 'index']);
 Route::get('report', [Pages::class, 'report']);
 
 //---- Datatables
-// Route::get('/l')
+Route::get('load_transaksi', [Operation::class, '_loadTransaksi'])->name('datatable');
+Route::post('detail_transaksi', [Operation::class, '_detailTransaksi'])->name('detail');
+
+
+
+//---- Ajax Routes
+Route::post('search', [Operation::class, '_searchPKB'])->name('search');
 
 //---- Routes Form
 Route::post('import', [Files::class, '_import']);

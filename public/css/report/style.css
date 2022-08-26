@@ -3,7 +3,7 @@
 }
 
 .file-label {
-    width: 80%;
+    width: 100%;
     min-height: 100px;
     border: 1.5px dashed rgb(107, 107, 107);
     display: flex;
