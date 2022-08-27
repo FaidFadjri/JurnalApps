@@ -14,8 +14,13 @@ class Operation extends Controller
         $data = DB::table('transaction_pkb')->select(DB::raw('*, jasa as jasa'))
             ->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo')->get()->toArray();
         return Datatables::of($data)->addColumn('action', function ($data) {
-            $html = '<a class="btn-delete btn btn-danger px-3 py-2" data-wo="' . $data->wo . '">Hapus</a>';
-            $html .= '<a class="btn-detail btn btn-success px-3 py-2 ml-1" data-wo="' . $data->wo . '">Export Jurnal</a>';
+            $html  = '';
+            $html .= '<form action="/export/wo" method="POST">';
+            $html .= '<input type="hidden" name="_token" value="Ga4ZQZAJCk0YlsJIvSU9BOtaYZKkjhK2VpB9Epx0">';
+            $html .= '<input type="hidden" name="wo" value="' . $data->wo . '">';
+            $html .= '<a class="btn-delete btn btn-danger px-3 py-2" data-wo="' . $data->wo . '">Hapus</a>';
+            $html .= '<button type="submit" class="btn-detail btn btn-success px-3 py-2 ml-1">Export Jurnal</button>';
+            $html .= '</form>';
             return $html;
         })->addIndexColumn()->make(true);
     }
@@ -55,6 +60,26 @@ class Operation extends Controller
                         'message' => 'Data berhasil',
                     ];
                     return response()->json($response, 404);
+                }
+            }
+        }
+    }
+
+    protected function _deletePKB()
+    {
+        if (request()->has('wo')) {
+            if (request()->get('wo')) {
+                $wo            = request()->get('wo');
+                $deleteDetail  = DB::table('transaction_detail')->where('wo', $wo)->delete();
+                if ($deleteDetail) {
+                    $deletePKB = DB::table('transaction_pkb')->where('wo', $wo)->delete();
+                    if ($deletePKB) {
+                        return response()->json($wo, 200);
+                    } else {
+                        return response()->json('Error Code : Delete x WO', 500);
+                    }
+                } else {
+                    return response()->json('Error Code : Delete x WO Detail', 500);
                 }
             }
         }

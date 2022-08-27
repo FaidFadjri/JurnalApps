@@ -28,6 +28,12 @@ Route::post('detail_transaksi', [Operation::class, '_detailTransaksi'])->name('d
 
 //---- Ajax Routes
 Route::post('search', [Operation::class, '_searchPKB'])->name('search');
+Route::post('delete', [Operation::class, '_deletePKB']);
+
+
+//---- Export Routes
+Route::post('export/wo', [Files::class, '_exportPKB']);
+Route::post('export', [Files::class, '_exportAll']);
 
 //---- Routes Form
 Route::post('import', [Files::class, '_import']);
