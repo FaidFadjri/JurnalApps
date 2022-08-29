@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PKBModels;
 use Illuminate\Http\Request;
 use App\Models\Transaction;
+use App\Models\TransactionCode;
 use Exception;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,12 @@ use Ramsey\Uuid\Type\Integer;
 
 class Files extends Controller
 {
+    protected $PKB;
+    public function __construct()
+    {
+        $this->PKB = new PKBModels();
+    }
+
     protected function _import()
     {
         $file = request()->file('file');
@@ -167,7 +174,7 @@ class Files extends Controller
             if (request()->get('id')) {
 
                 $id      = request()->get('id');
-                $PKB  = PKBModels::select("*")
+                $PKB     = PKBModels::select(DB::raw('*'))
                     ->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->where('transaction_pkb.id', '=', $id)->get()->first()->toArray();
 
@@ -227,20 +234,24 @@ class Files extends Controller
                 $journalResult = array();
                 foreach ($debitFields as $debit) {
                     if ($PKB[$debit['name']]) {
+                        $kode = $PKB[$debit['kode']];
                         $journalResult['debit'][] = [
-                            'name'     => $debit['name'],
-                            'nominal'  => $PKB[$debit['name']],
-                            'kode'     => $PKB[$debit['kode']]
+                            'name'          => $debit['name'],
+                            'nominal'       => $PKB[$debit['name']],
+                            'kode'          => $kode,
+                            'keterangan'    => TransactionCode::find($kode)->toArray()['keterangan']
                         ];
                     }
                 }
 
                 foreach ($kreditFields as $kredit) {
                     if ($PKB[$kredit['name']]) {
+                        $kode = $PKB[$kredit['kode']];
                         $journalResult['kredit'][] = [
                             'name'     => $kredit['name'],
                             'nominal'  => $PKB[$kredit['name']],
-                            'kode'     => $PKB[$kredit['kode']]
+                            'kode'     => $PKB[$kredit['kode']],
+                            'keterangan'    => TransactionCode::find($kode)->toArray()['keterangan']
                         ];
                     }
                 }
@@ -299,6 +310,8 @@ class Files extends Controller
                 foreach ($journalResult['debit'] as $key) {
                     $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
                         ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key['keterangan'])->getStyle('B' . $row)
+                        ->getFont()->setSize(10);
                     $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
                         ->getFont()->setSize(10);
                     $spreadsheet->getActiveSheet()->setCellValue('E' . $row, $key['nominal'])->getStyle('E' . $row)
@@ -311,6 +324,8 @@ class Files extends Controller
                 #---- Add Kredit
                 foreach ($journalResult['kredit'] as $key) {
                     $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key['keterangan'])->getStyle('B' . $row)
                         ->getFont()->setSize(10);
                     $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
                         ->getFont()->setSize(10);
@@ -413,10 +428,12 @@ class Files extends Controller
                 foreach ($PKBList as $PKB) {
                     foreach ($debitFields as $debit) {
                         if ($PKB[$debit['name']]) {
+                            $kode = $PKB[$debit['kode']];
                             $journalResult[$PKB['id_pkb']]['debit'][] = [
-                                'name'     => $debit['name'],
-                                'nominal'  => $PKB[$debit['name']],
-                                'kode'     => $PKB[$debit['kode']]
+                                'name'       => $debit['name'],
+                                'nominal'    => $kode,
+                                'kode'       => $PKB[$debit['kode']],
+                                'keterangan' => TransactionCode::find($kode)->toArray()['keterangan']
                             ];
                         }
                     }
@@ -425,10 +442,12 @@ class Files extends Controller
                 foreach ($PKBList as $PKB) {
                     foreach ($kreditFields as $kredit) {
                         if ($PKB[$kredit['name']]) {
+                            $kode = $PKB[$kredit['kode']];
                             $journalResult[$PKB['id_pkb']]['kredit'][] = [
                                 'name'     => $kredit['name'],
                                 'nominal'  => $PKB[$kredit['name']],
-                                'kode'     => $PKB[$kredit['kode']]
+                                'kode'     => $PKB[$kredit['kode']],
+                                'keterangan' => TransactionCode::find($kode)->toArray()['keterangan']
                             ];
                         }
                     }
@@ -491,6 +510,8 @@ class Files extends Controller
                     foreach ($journalResult[$PKB['id_pkb']]['debit'] as $key) {
                         $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
                             ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key['keterangan'])->getStyle('B' . $row)
+                            ->getFont()->setSize(10);
                         $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
                             ->getFont()->setSize(10);
                         $spreadsheet->getActiveSheet()->setCellValue('E' . $row, $key['nominal'])->getStyle('E' . $row)
@@ -503,6 +524,8 @@ class Files extends Controller
                     #---- Add Kredit
                     foreach ($journalResult[$PKB['id_pkb']]['kredit'] as $key) {
                         $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key['keterangan'])->getStyle('B' . $row)
                             ->getFont()->setSize(10);
                         $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
                             ->getFont()->setSize(10);

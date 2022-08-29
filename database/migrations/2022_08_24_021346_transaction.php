@@ -20,7 +20,7 @@ class Transaction extends Migration
         //---- Transaction code as account code
         Schema::create('transaction_code', function (Blueprint $table) {
             $table->engine = 'InnoDB'; // <- add this
-            $table->string('code')->unique()->primary();
+            $table->string('code', 250)->unique()->primary()->index();
             $table->string('keterangan');
         });
 
@@ -45,6 +45,7 @@ class Transaction extends Migration
             $table->integer('OPL');
             $table->integer('OPB');
             $table->string('kode_jasa');
+
             $table->string('kode_parts');
             $table->string('kode_bahan');
             $table->string('kode_opl');

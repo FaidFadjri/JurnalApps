@@ -3,6 +3,7 @@ var table = $('#transactionTable').DataTable({
     processing: true,
     serverSide: true,
     responsive: true,
+    lengthMenu: [ [5, 10, 20, -1], [5, 10, 20, "All"] ],
     ajax: {
         url : '/load_transaksi',
         data : function (d) { 
