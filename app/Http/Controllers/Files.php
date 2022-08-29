@@ -167,28 +167,83 @@ class Files extends Controller
             if (request()->get('id')) {
 
                 $id      = request()->get('id');
-                $result  = PKBModels::select("*")
+                $PKB  = PKBModels::select("*")
                     ->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->where('transaction_pkb.id', '=', $id)->get()->first()->toArray();
 
-                $debitFields   = ['total', 'discJasa', 'discParts', 'discBahan', 'discOPL', 'discOPB'];
-                $kreditFields  = ['jasa', 'parts', 'bahan', 'OPL', 'OPB', 'ppn'];
+                $debitFields   = [
+                    [
+                        'name' => 'total',
+                        'kode' => 'kode_total'
+                    ],
+                    [
+                        'name' => 'discJasa',
+                        'kode' => 'kode_discJasa'
+                    ],
+                    [
+                        'name' => 'discParts',
+                        'kode' => 'kode_discParts'
+                    ],
+                    [
+                        'name' => 'discBahan',
+                        'kode' => 'kode_discBahan'
+                    ],
+                    [
+                        'name' => 'discOPL',
+                        'kode' => 'kode_discOpl'
+                    ],
+                    [
+                        'name' => 'discOPB',
+                        'kode' => 'kode_discOpb'
+                    ],
+                ];
+                $kreditFields  = [
+                    [
+                        'name' => 'jasa',
+                        'kode' => 'kode_jasa'
+                    ],
+                    [
+                        'name' => 'parts',
+                        'kode' => 'kode_parts'
+                    ],
+                    [
+                        'name' => 'bahan',
+                        'kode' => 'kode_bahan'
+                    ],
+                    [
+                        'name' => 'OPL',
+                        'kode' => 'kode_opl'
+                    ],
+                    [
+                        'name' => 'OPB',
+                        'kode' => 'kode_opb'
+                    ],
+                    [
+                        'name' => 'ppn',
+                        'kode' => 'kode_ppn'
+                    ],
+                ];
+
                 $journalResult = array();
                 foreach ($debitFields as $debit) {
-                    $journalResult['debit'][] = [
-                        'name'     => $debit,
-                        'nominal'  => $result[$debit],
-                    ];
+                    if ($PKB[$debit['name']]) {
+                        $journalResult['debit'][] = [
+                            'name'     => $debit['name'],
+                            'nominal'  => $PKB[$debit['name']],
+                            'kode'     => $PKB[$debit['kode']]
+                        ];
+                    }
                 }
 
                 foreach ($kreditFields as $kredit) {
-                    $journalResult['kredit'][] = [
-                        'name'     => $kredit,
-                        'nominal'  => $result[$kredit],
-                    ];
+                    if ($PKB[$kredit['name']]) {
+                        $journalResult['kredit'][] = [
+                            'name'     => $kredit['name'],
+                            'nominal'  => $PKB[$kredit['name']],
+                            'kode'     => $PKB[$kredit['kode']]
+                        ];
+                    }
                 }
-
-                dd($journalResult);
 
                 //---- Export to Excel
                 $spreadsheet = new Spreadsheet();
@@ -203,11 +258,11 @@ class Files extends Controller
                     ->getFont()->setSize(10);
                 $spreadsheet->getActiveSheet()->setCellValue('A3', 'Tahun Fiskal :')->getStyle('A3')
                     ->getFont()->setSize(10);
-                $spreadsheet->getActiveSheet()->setCellValue('B3', $result[0]->tanggalInvoice . " - " . $result[sizeof($result) - 1]->tanggalInvoice)->getStyle('B3')
+                $spreadsheet->getActiveSheet()->setCellValue('B3', $PKB['invoice_date'] . " - " . $PKB['invoice_date'])->getStyle('B3')
                     ->getFont()->setSize(10);
                 $spreadsheet->getActiveSheet()->setCellValue('A4', 'Periode :')->getStyle('A4')
                     ->getFont()->setSize(10);
-                $spreadsheet->getActiveSheet()->setCellValue('B4', $result[0]->tanggalInvoice . " - " . $result[sizeof($result) - 1]->tanggalInvoice)->getStyle('B4')
+                $spreadsheet->getActiveSheet()->setCellValue('B4', $PKB['invoice_date'] . " - " . $PKB['invoice_date'])->getStyle('B4')
                     ->getFont()->setSize(10);
                 $spreadsheet->getActiveSheet()->setCellValue('A5', 'Jenis :')->getStyle('A5')
                     ->getFont()->setSize(10);
@@ -231,34 +286,40 @@ class Files extends Controller
                 }
                 $spreadsheet->getActiveSheet()->getRowDimension(6)->setRowHeight(26);
 
-                // //---- Create Table
-                // $row = 7; //---- Row Start From
-                // foreach ($result as $index => $key) {
+                #---- Create Table
+                $row = 7; #---- Row Start From
+                $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $PKB['wo'])->getStyle('B' . $row)
+                    ->getFont()->setSize(10);
+                $spreadsheet->getActiveSheet()->setCellValue('C' . $row, $PKB['invoice_date'])->getStyle('C' . $row)
+                    ->getFont()->setSize(10);
+                $row++;
 
-                //     if ($index === 0) {
-                //         $spreadsheet->getActiveSheet()->setCellValue('C' . $row, $key->tanggalInvoice)->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
-                //         $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key->WoNo)->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
-                //         $row++;
-                //     }
 
-                //     if ($key->kredit > 0) {
-                //         $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key->kodeAkun)->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
-                //         $spreadsheet->getActiveSheet()->setCellValue('D' . $row, $key->deskripsi)->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
-                //         $spreadsheet->getActiveSheet()->setCellValue('E' . $row, number_format($key->debit, 0, ',', '.'))->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
+                #---- Add Debit
+                foreach ($journalResult['debit'] as $key) {
+                    $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('E' . $row, $key['nominal'])->getStyle('E' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('G' . $row, $key['name'])->getStyle('G' . $row)
+                        ->getFont()->setSize(10);
+                    $row++;
+                }
 
-                //         $spreadsheet->getActiveSheet()->setCellValue('F' . $row, number_format($key->kredit, 0, ',', '.'))->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
-                //         $spreadsheet->getActiveSheet()->setCellValue('G' . $row, strtoupper($key->kreditName))->getStyle($column . '6')
-                //             ->getFont()->setSize(10)->setItalic(true);
-                //         $row++;
-                //     }
-                // }
-
+                #---- Add Kredit
+                foreach ($journalResult['kredit'] as $key) {
+                    $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('F' . $row, $key['nominal'])->getStyle('E' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('G' . $row, $key['name'])->getStyle('G' . $row)
+                        ->getFont()->setSize(10);
+                    $row++;
+                }
 
                 //--- Set Auto Width
                 foreach (range("A", "G") as $columnID) {
@@ -267,7 +328,7 @@ class Files extends Controller
                 }
 
                 $writer   = new Xlsx($spreadsheet);
-                $filename = "Jurnal ";
+                $filename = "JURNAL " . $PKB['wo'];
 
 
                 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -287,81 +348,89 @@ class Files extends Controller
                 $startDate = request()->get('startDate');
                 $endDate   = request()->get('endDate');
 
-                //----- Result Query Convert to Jurnal
-                $firstQuery = DB::table('transaction_pkb')->select(DB::raw("kode_jasa as kodeAkun,
-                invoice_date as tanggalInvoice,
-                CONCAT(customer, ' | ', license_plate) as deskripsi,
-                wo as WoNo,
-                SUM(total) as debit,
-                '' as kreditName,
-                0 as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
-                    ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo');
 
-                $jasa = DB::table('transaction_pkb')->select(DB::raw("kode_jasa as kodeAkun,
-                invoice_date as tanggalInvoice,
-                CONCAT(customer, ' | ', license_plate) as deskripsi,
-                wo as WoNo,
-                SUM(total) as debit,
-                'jasa' as kreditName,
-                jasa as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
-                    ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
-                    ->unionAll($firstQuery);
+                $PKBList  = (array) PKBModels::select("*")
+                    ->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
+                    ->whereDate('invoice_date', '>=', $startDate)->whereDate('invoice_date', '<=', $endDate)->get()->toArray();
 
-                $parts = DB::table('transaction_pkb')->select(DB::raw("kode_parts as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    wo as WoNo,
-                    SUM(total) as debit,
-                    'parts' as kreditName,
-                    parts as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
-                    ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
-                    ->unionAll($jasa);
+                $debitFields   = [
+                    [
+                        'name' => 'total',
+                        'kode' => 'kode_total'
+                    ],
+                    [
+                        'name' => 'discJasa',
+                        'kode' => 'kode_discJasa'
+                    ],
+                    [
+                        'name' => 'discParts',
+                        'kode' => 'kode_discParts'
+                    ],
+                    [
+                        'name' => 'discBahan',
+                        'kode' => 'kode_discBahan'
+                    ],
+                    [
+                        'name' => 'discOPL',
+                        'kode' => 'kode_discOpl'
+                    ],
+                    [
+                        'name' => 'discOPB',
+                        'kode' => 'kode_discOpb'
+                    ],
+                ];
+                $kreditFields  = [
+                    [
+                        'name' => 'jasa',
+                        'kode' => 'kode_jasa'
+                    ],
+                    [
+                        'name' => 'parts',
+                        'kode' => 'kode_parts'
+                    ],
+                    [
+                        'name' => 'bahan',
+                        'kode' => 'kode_bahan'
+                    ],
+                    [
+                        'name' => 'OPL',
+                        'kode' => 'kode_opl'
+                    ],
+                    [
+                        'name' => 'OPB',
+                        'kode' => 'kode_opb'
+                    ],
+                    [
+                        'name' => 'ppn',
+                        'kode' => 'kode_ppn'
+                    ],
+                ];
 
-                $bahan = DB::table('transaction_pkb')->select(DB::raw("kode_bahan as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    wo as WoNo,
-                    SUM(total) as debit,
-                    'bahan' as kreditName,
-                    bahan as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
-                    ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
-                    ->unionAll($parts);
-
-                $opl = DB::table('transaction_pkb')->select(DB::raw("kode_opl as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    wo as WoNo,
-                    SUM(total) as debit,
-                    'opl' as kreditName,
-                    OPL as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
-                    ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
-                    ->unionAll($bahan);
-
-                //--- as OPB
-                $result = DB::table('transaction_pkb')->select(DB::raw("kode_opb as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    wo as WoNo,
-                    SUM(total) as debit,
-                    'opb' as kreditName,
-                    OPB as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
-                    ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
-                    ->unionAll($opl)->orderBy('debit', 'DESC')->get()->toArray();
+                $journalResult = array();
 
 
-                if (!$result) {
-                    session()->flash('error', 'Jurnal tidak di temukan di tanggal tersebut');
-                    return redirect()->to(session()->previousUrl());
+                #---- save data according category which using id_pkb
+                foreach ($PKBList as $PKB) {
+                    foreach ($debitFields as $debit) {
+                        if ($PKB[$debit['name']]) {
+                            $journalResult[$PKB['id_pkb']]['debit'][] = [
+                                'name'     => $debit['name'],
+                                'nominal'  => $PKB[$debit['name']],
+                                'kode'     => $PKB[$debit['kode']]
+                            ];
+                        }
+                    }
                 }
 
-                $uniqueWO = DB::table('transaction_pkb')->select('wo')->distinct()->get()->toArray();
-                $resultGroup = []; //---- Grouping Wrapper
-
-                //---- Grouping PKB with the same Work Order
-                foreach ($uniqueWO as $grup) {
-                    $keys = array_keys(array_combine(array_keys($result), array_column($result, 'WoNo')), $grup->wo);
-                    foreach ($keys as $data) {
-                        $resultGroup[$grup->wo][] = $result[$data];
+                foreach ($PKBList as $PKB) {
+                    foreach ($kreditFields as $kredit) {
+                        if ($PKB[$kredit['name']]) {
+                            $journalResult[$PKB['id_pkb']]['kredit'][] = [
+                                'name'     => $kredit['name'],
+                                'nominal'  => $PKB[$kredit['name']],
+                                'kode'     => $PKB[$kredit['kode']]
+                            ];
+                        }
                     }
                 }
 
@@ -378,11 +447,11 @@ class Files extends Controller
                     ->getFont()->setSize(10);
                 $spreadsheet->getActiveSheet()->setCellValue('A3', 'Tahun Fiskal :')->getStyle('A3')
                     ->getFont()->setSize(10);
-                $spreadsheet->getActiveSheet()->setCellValue('B3', $result[0]->tanggalInvoice . " - " . $result[sizeof($result) - 1]->tanggalInvoice)->getStyle('B3')
+                $spreadsheet->getActiveSheet()->setCellValue('B3', $PKBList[0]['invoice_date'] . " - " . $PKBList[sizeof($PKBList) - 1]['invoice_date'])->getStyle('B3')
                     ->getFont()->setSize(10);
                 $spreadsheet->getActiveSheet()->setCellValue('A4', 'Periode :')->getStyle('A4')
                     ->getFont()->setSize(10);
-                $spreadsheet->getActiveSheet()->setCellValue('B4', $result[0]->tanggalInvoice . " - " . $result[sizeof($result) - 1]->tanggalInvoice)->getStyle('B4')
+                $spreadsheet->getActiveSheet()->setCellValue('B4', $PKBList[0]['invoice_date'] . " - " . $PKBList[sizeof($PKBList) - 1]['invoice_date'])->getStyle('B4')
                     ->getFont()->setSize(10);
                 $spreadsheet->getActiveSheet()->setCellValue('A5', 'Jenis :')->getStyle('A5')
                     ->getFont()->setSize(10);
@@ -406,47 +475,53 @@ class Files extends Controller
                 }
                 $spreadsheet->getActiveSheet()->getRowDimension(6)->setRowHeight(26);
 
-                //---- Create Table
-                $row = 7; //---- Row Start From
-                if ($resultGroup) {
-                    foreach ($resultGroup as $NoWo) {
-                        foreach ($NoWo as $index => $key) {
 
-                            if ($index === 0) {
-                                $spreadsheet->getActiveSheet()->setCellValue('C' . $row, $key->tanggalInvoice)->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
-                                $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key->WoNo)->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
-                                $row++;
-                            }
 
-                            if ($key->kredit > 0) {
-                                $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key->kodeAkun)->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
-                                $spreadsheet->getActiveSheet()->setCellValue('D' . $row, $key->deskripsi)->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
-                                $spreadsheet->getActiveSheet()->setCellValue('E' . $row, number_format($key->debit, 0, '.', '.'))->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
+                #---- Create Table
+                $row = 7;
+                foreach ($PKBList as $PKB) {
+                    $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $PKB['wo'])->getStyle('B' . $row)
+                        ->getFont()->setSize(10);
+                    $spreadsheet->getActiveSheet()->setCellValue('C' . $row, $PKB['invoice_date'])->getStyle('C' . $row)
+                        ->getFont()->setSize(10);
+                    $row++;
 
-                                $spreadsheet->getActiveSheet()->setCellValue('F' . $row, number_format($key->kredit, 0, '.', '.'))->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
-                                $spreadsheet->getActiveSheet()->setCellValue('G' . $row, strtoupper($key->kreditName))->getStyle($column . '6')
-                                    ->getFont()->setSize(10)->setItalic(true);
-                                $row++;
-                            }
-                        }
+
+                    #---- Add Debit
+                    foreach ($journalResult[$PKB['id_pkb']]['debit'] as $key) {
+                        $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('E' . $row, $key['nominal'])->getStyle('E' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('G' . $row, $key['name'])->getStyle('G' . $row)
+                            ->getFont()->setSize(10);
+                        $row++;
+                    }
+
+                    #---- Add Kredit
+                    foreach ($journalResult[$PKB['id_pkb']]['kredit'] as $key) {
+                        $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key['kode'])->getStyle('A' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('D' . $row, strtoupper($PKB['customer']) . " | " . $PKB['license_plate'])->getStyle('D' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('F' . $row, $key['nominal'])->getStyle('E' . $row)
+                            ->getFont()->setSize(10);
+                        $spreadsheet->getActiveSheet()->setCellValue('G' . $row, $key['name'])->getStyle('G' . $row)
+                            ->getFont()->setSize(10);
+                        $row++;
                     }
                 }
 
-
                 //--- Set Auto Width
-                foreach ($columnArray as $columnID) {
+                foreach (range("A", "G") as $columnID) {
                     $spreadsheet->getActiveSheet()->getColumnDimension($columnID)
                         ->setAutoSize(true);
                 }
 
                 $writer   = new Xlsx($spreadsheet);
-                $filename = "Jurnal " . "$startDate - $endDate";
+                $filename = "JURNAL-$startDate-$endDate";
 
 
                 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -454,7 +529,13 @@ class Files extends Controller
                 header('Cache-Control: max-age=0');
                 $writer->save('php://output');
                 die;
+            } else {
+                session()->flash('error', 'Pilih rentang tanggal terlebih dahulu');
+                return redirect()->to(session()->previousUrl());
             }
+        } else {
+            session()->flash('error', 'error : date is undefined');
+            return redirect()->to(session()->previousUrl());
         }
     }
 
