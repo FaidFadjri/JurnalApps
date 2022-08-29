@@ -4,6 +4,25 @@
     <link rel="stylesheet" href="/css/report/style.css">
 
     <div class="container mt-5">
+        @if ($errorPKB)
+            <div class="row">
+                <div class="col-12 mb-2">
+                    <a class="btn btn-success text-white p-2 px-3 float-right" href="/error/export">Export WO Error</a>
+                    <a class="btn btn-warning text-white p-2 px-3" href="/error/delete">Hapus pesan error</a>
+                </div>
+                @foreach ($errorPKB as $item)
+                    <div class="col-12">
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                            <strong>Oops!</strong> {{ $item['wo'] }}; error : {{ $item['error'] }}
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
         @if (Session::has('pesan'))
             <div class="row">
                 <div class="col-12">

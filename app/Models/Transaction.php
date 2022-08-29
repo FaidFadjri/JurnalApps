@@ -36,7 +36,7 @@ class Transaction extends Model
         'total',
         'kode_total',
 
-        'wo',
+        'id_pkb',
         'invoice_date',
     ];
 }

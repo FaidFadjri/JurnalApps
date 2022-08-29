@@ -15,8 +15,9 @@ class Pages extends Controller
 
     function report()
     {
-        $components['title'] = "Report";
-        $components['nav']   = "report";
+        $components['title']        = "Report";
+        $components['nav']          = "report";
+        $components['errorPKB']     = session()->get('errorPKB');
         return view('pages.report', $components);
     }
 }

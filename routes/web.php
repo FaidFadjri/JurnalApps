@@ -31,6 +31,13 @@ Route::post('search', [Operation::class, '_searchPKB'])->name('search');
 Route::post('delete', [Operation::class, '_deletePKB']);
 
 
+//---- Handle PKB Error
+Route::group(['prefix' => 'error'], function () {
+    Route::get('delete', [Operation::class, '_deleteError']);
+    Route::get('export', [Operation::class, '_exportError']);
+});
+
+
 //---- Export Routes
 Route::post('export/wo', [Files::class, '_exportPKB']);
 Route::post('export', [Files::class, '_exportAll']);

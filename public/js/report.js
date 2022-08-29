@@ -3,7 +3,13 @@ var table = $('#transactionTable').DataTable({
     processing: true,
     serverSide: true,
     responsive: true,
-    ajax: '/load_transaksi',
+    ajax: {
+        url : '/load_transaksi',
+        data : function (d) { 
+            d.startDate = $("#startDate").val();
+            d.endDate   = $("#endDate").val();
+        }
+    },
     columns: [{
             data: 'DT_RowIndex',
             name: 'DT_RowIndex',
@@ -74,9 +80,20 @@ var table = $('#transactionTable').DataTable({
         }
     ]
 });
+
+
+//---- Custom Date Filter
+$("#startDate, #endDate").change(function (e) { 
+    e.preventDefault();
+    table.draw();    
+});
+
+
+
+
 //---- Delete PKB
 $(document).on('click', '.btn-delete', function () { 
-    var NoWo = $(this).attr('data-wo');
+    var idPKB = $(this).attr('data-id');
     vex.dialog.confirm({
         message: 'Yakin Hapus data WO ini ?',
         callback: function(value) {
@@ -85,7 +102,7 @@ $(document).on('click', '.btn-delete', function () {
                     type: "POST",
                     url: "/delete",
                     data: {
-                        wo : NoWo
+                        id : idPKB
                     },
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -93,10 +110,14 @@ $(document).on('click', '.btn-delete', function () {
                     dataType: "json",
                     success: function (response) {
                         vex.dialog.alert({
-                            message: 'Data WO Sudah Berhasil Di Hapus',
+                            message: response,
                         })
 
                         table.draw();
+                    }, error: function (xhr, status, error) { 
+                        vex.dialog.alert({
+                            message: error,
+                        })
                     }
                 });
             } else {

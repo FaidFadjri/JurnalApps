@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\PKBModels;
 use Illuminate\Http\Request;
 use App\Models\Transaction;
+use Exception;
+use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Ramsey\Uuid\Type\Integer;
 
 class Files extends Controller
 {
@@ -25,6 +28,7 @@ class Files extends Controller
 
         $spreadsheet = $render->load($file);
         $data        = $spreadsheet->getActiveSheet()->toArray();
+        $errorPKB    = array();
 
         //---- Data start from index 2 which used as row in excel
         //---- Index 1 and 2 was the heading
@@ -41,9 +45,23 @@ class Files extends Controller
                 'license_plate' => $license_plate,
                 'customer'      => $customer
             ];
-            $getWO = PKBModels::select('*')->where('wo', '=', $wo)->get()->toArray();
+            $getWO = PKBModels::select('*')->where('wo', '=', $wo)->where('customer', $customer)->get()->toArray();
+            $idPKB = -1;
+
             if (!$getWO) {
-                PKBModels::updateOrCreate($PKB); # if there is no work order then insert it
+                try {
+                    $insert = PKBModels::updateOrCreate($PKB); # try insert until success
+                    if ($insert) {
+                        $idPKB        = $insert->id;
+                    }
+                } catch (Exception $error) { # if fails save exception
+                    $errorPKB[]  = [
+                        'wo'        => $wo,
+                        'error'     => $error->getMessage()
+                    ];
+                    // continue;
+                    dd($error);
+                }
             }
 
             # insert kredit
@@ -98,89 +116,79 @@ class Files extends Controller
                 'kode_discBahan' => $kodeDiscBahan,
                 'kode_discOpl'   => $kodeDiscOPL,
                 'kode_discOpb'   => $kodeDiscOPB,
-                'ppn'        => $ppn,
-                'kode_ppn'   => $kodePPN,
-                'total'      => $total,
-                'kode_total' => $kodeTotal,
+                'ppn'            => $ppn,
+                'kode_ppn'       => $kodePPN,
+                'total'          => $total,
+                'kode_total'     => $kodeTotal,
 
-                'wo'           => $wo,
-                'invoice_date' => $invoiceDate,
+                'id_pkb'         => $idPKB,
+                'invoice_date'   => $invoiceDate,
             ];
 
-            Transaction::updateOrCreate($detail);
+
+            # check if data is balanced
+            $totalNetDisc  = intval($discJasa) + intval($discParts) + intval($discBahan) + intval($discOPL) + intval($discOPB);
+            $totalNetSales = intval($netJasa) + intval($netParts) + intval($netBahan) + intval($netOPL) + intval($netOPB);
+            $balance       = $this->checkBalance($total, $totalNetDisc, $totalNetSales, $ppn);
+            if ($balance) {
+                try { # try insert
+                    Transaction::updateOrCreate($detail);
+                } catch (Exception $error) {
+                    $errorPKB[]  = [
+                        'wo'        => $wo,
+                        'error'     => $error->getMessage()
+                    ];
+                    continue;
+                }
+            } else {
+                # if data not balance then add array message to errorPKB
+                $errorPKB[]   = [
+                    'wo'      => $wo,
+                    'error'   => "Hasil Penghitungan Tidak Balance"
+                ];
+
+                # delete PKB data
+                PKBModels::where('wo', $wo)->where('customer', $customer)->delete();
+                continue;
+            }
         }
-        session()->flash('pesan', 'Data penjualan berhasil di upload');
+
+        //---- save error to a session
+        session()->put('errorPKB', $errorPKB);
+        if (!$errorPKB) {
+            session()->flash('pesan', 'Selamat Data Berhasil Di Tambahkan');
+        }
         return redirect()->to(session()->previousUrl());
     }
 
     protected function _exportPKB()
     {
-        if (request()->has('wo')) {
-            if (request()->get('wo')) {
-                $wo     = request()->get('wo');
-                // dd($wo);
+        if (request()->has('id')) {
+            if (request()->get('id')) {
 
-                //----- Result Query Convert to Jurnal
+                $id      = request()->get('id');
+                $result  = PKBModels::select("*")
+                    ->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
+                    ->where('transaction_pkb.id', '=', $id)->get()->first()->toArray();
 
-                $firstQuery = DB::table('transaction_pkb')->select(DB::raw("kode_jasa as kodeAkun,
-                invoice_date as tanggalInvoice,
-                CONCAT(customer, ' | ', license_plate) as deskripsi,
-                transaction_detail.wo as WoNo,
-                SUM(CASE WHEN transaction_detail.wo = '$wo' THEN total END) as debit,
-                '' as kreditName,
-                0 as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
-                    ->where('transaction_detail.wo', $wo);
+                $debitFields   = ['total', 'discJasa', 'discParts', 'discBahan', 'discOPL', 'discOPB'];
+                $kreditFields  = ['jasa', 'parts', 'bahan', 'OPL', 'OPB', 'ppn'];
+                $journalResult = array();
+                foreach ($debitFields as $debit) {
+                    $journalResult['debit'][] = [
+                        'name'     => $debit,
+                        'nominal'  => $result[$debit],
+                    ];
+                }
 
-                $jasa = DB::table('transaction_pkb')->select(DB::raw("kode_jasa as kodeAkun,
-                invoice_date as tanggalInvoice,
-                CONCAT(customer, ' | ', license_plate) as deskripsi,
-                transaction_detail.wo as WoNo,
-                SUM(CASE WHEN transaction_detail.wo = '$wo' THEN total END) as debit,
-                'jasa' as kreditName,
-                jasa as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
-                    ->where('transaction_detail.wo', $wo)
-                    ->unionAll($firstQuery);
+                foreach ($kreditFields as $kredit) {
+                    $journalResult['kredit'][] = [
+                        'name'     => $kredit,
+                        'nominal'  => $result[$kredit],
+                    ];
+                }
 
-                $parts = DB::table('transaction_pkb')->select(DB::raw("kode_parts as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
-                    SUM(CASE WHEN transaction_detail.wo = '$wo' THEN total END) as debit,
-                    'parts' as kreditName,
-                    parts as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
-                    ->where('transaction_detail.wo', $wo)
-                    ->unionAll($jasa);
-
-                $bahan = DB::table('transaction_pkb')->select(DB::raw("kode_bahan as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
-                    SUM(CASE WHEN transaction_detail.wo = '$wo' THEN total END) as debit,
-                    'bahan' as kreditName,
-                    bahan as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
-                    ->where('transaction_detail.wo', $wo)
-                    ->unionAll($parts);
-
-                $opl = DB::table('transaction_pkb')->select(DB::raw("kode_opl as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
-                    SUM(CASE WHEN transaction_detail.wo = '$wo' THEN total END) as debit,
-                    'opl' as kreditName,
-                    OPL as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
-                    ->where('transaction_detail.wo', $wo)
-                    ->unionAll($bahan);
-
-                //--- as OPB
-                $result = DB::table('transaction_pkb')->select(DB::raw("kode_opb as kodeAkun,
-                    invoice_date as tanggalInvoice,
-                    CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
-                    SUM(CASE WHEN transaction_detail.wo = '$wo' THEN total END) as debit,
-                    'opb' as kreditName,
-                    OPB as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
-                    ->where('transaction_detail.wo', $wo)
-                    ->unionAll($opl)->orderBy('debit', 'DESC')->get()->toArray();
+                dd($journalResult);
 
                 //---- Export to Excel
                 $spreadsheet = new Spreadsheet();
@@ -223,43 +231,43 @@ class Files extends Controller
                 }
                 $spreadsheet->getActiveSheet()->getRowDimension(6)->setRowHeight(26);
 
-                //---- Create Table
-                $row = 7; //---- Row Start From
-                foreach ($result as $index => $key) {
+                // //---- Create Table
+                // $row = 7; //---- Row Start From
+                // foreach ($result as $index => $key) {
 
-                    if ($index === 0) {
-                        $spreadsheet->getActiveSheet()->setCellValue('C' . $row, $key->tanggalInvoice)->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
-                        $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key->WoNo)->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
-                        $row++;
-                    }
+                //     if ($index === 0) {
+                //         $spreadsheet->getActiveSheet()->setCellValue('C' . $row, $key->tanggalInvoice)->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
+                //         $spreadsheet->getActiveSheet()->setCellValue('B' . $row, $key->WoNo)->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
+                //         $row++;
+                //     }
 
-                    if ($key->kredit > 0) {
-                        $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key->kodeAkun)->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
-                        $spreadsheet->getActiveSheet()->setCellValue('D' . $row, $key->deskripsi)->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
-                        $spreadsheet->getActiveSheet()->setCellValue('E' . $row, number_format($key->debit, 0, '.', '.'))->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
+                //     if ($key->kredit > 0) {
+                //         $spreadsheet->getActiveSheet()->setCellValue('A' . $row, $key->kodeAkun)->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
+                //         $spreadsheet->getActiveSheet()->setCellValue('D' . $row, $key->deskripsi)->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
+                //         $spreadsheet->getActiveSheet()->setCellValue('E' . $row, number_format($key->debit, 0, ',', '.'))->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
 
-                        $spreadsheet->getActiveSheet()->setCellValue('F' . $row, number_format($key->kredit, 0, '.', '.'))->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
-                        $spreadsheet->getActiveSheet()->setCellValue('G' . $row, strtoupper($key->kreditName))->getStyle($column . '6')
-                            ->getFont()->setSize(10)->setItalic(true);
-                        $row++;
-                    }
-                }
+                //         $spreadsheet->getActiveSheet()->setCellValue('F' . $row, number_format($key->kredit, 0, ',', '.'))->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
+                //         $spreadsheet->getActiveSheet()->setCellValue('G' . $row, strtoupper($key->kreditName))->getStyle($column . '6')
+                //             ->getFont()->setSize(10)->setItalic(true);
+                //         $row++;
+                //     }
+                // }
 
 
                 //--- Set Auto Width
-                foreach ($columnArray as $columnID) {
+                foreach (range("A", "G") as $columnID) {
                     $spreadsheet->getActiveSheet()->getColumnDimension($columnID)
                         ->setAutoSize(true);
                 }
 
                 $writer   = new Xlsx($spreadsheet);
-                $filename = "Jurnal " . $wo;
+                $filename = "Jurnal ";
 
 
                 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -283,49 +291,49 @@ class Files extends Controller
                 $firstQuery = DB::table('transaction_pkb')->select(DB::raw("kode_jasa as kodeAkun,
                 invoice_date as tanggalInvoice,
                 CONCAT(customer, ' | ', license_plate) as deskripsi,
-                transaction_detail.wo as WoNo,
+                wo as WoNo,
                 SUM(total) as debit,
                 '' as kreditName,
-                0 as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
+                0 as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo');
 
                 $jasa = DB::table('transaction_pkb')->select(DB::raw("kode_jasa as kodeAkun,
                 invoice_date as tanggalInvoice,
                 CONCAT(customer, ' | ', license_plate) as deskripsi,
-                transaction_detail.wo as WoNo,
+                wo as WoNo,
                 SUM(total) as debit,
                 'jasa' as kreditName,
-                jasa as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
+                jasa as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
                     ->unionAll($firstQuery);
 
                 $parts = DB::table('transaction_pkb')->select(DB::raw("kode_parts as kodeAkun,
                     invoice_date as tanggalInvoice,
                     CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
+                    wo as WoNo,
                     SUM(total) as debit,
                     'parts' as kreditName,
-                    parts as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
+                    parts as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
                     ->unionAll($jasa);
 
                 $bahan = DB::table('transaction_pkb')->select(DB::raw("kode_bahan as kodeAkun,
                     invoice_date as tanggalInvoice,
                     CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
+                    wo as WoNo,
                     SUM(total) as debit,
                     'bahan' as kreditName,
-                    bahan as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
+                    bahan as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
                     ->unionAll($parts);
 
                 $opl = DB::table('transaction_pkb')->select(DB::raw("kode_opl as kodeAkun,
                     invoice_date as tanggalInvoice,
                     CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
+                    wo as WoNo,
                     SUM(total) as debit,
                     'opl' as kreditName,
-                    OPL as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
+                    OPL as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
                     ->unionAll($bahan);
 
@@ -333,10 +341,10 @@ class Files extends Controller
                 $result = DB::table('transaction_pkb')->select(DB::raw("kode_opb as kodeAkun,
                     invoice_date as tanggalInvoice,
                     CONCAT(customer, ' | ', license_plate) as deskripsi,
-                    transaction_detail.wo as WoNo,
+                    wo as WoNo,
                     SUM(total) as debit,
                     'opb' as kreditName,
-                    OPB as kredit"))->join('transaction_detail', 'transaction_pkb.wo', '=', 'transaction_detail.wo', 'left')
+                    OPB as kredit"))->join('transaction_detail', 'transaction_pkb.id', '=', 'transaction_detail.id_pkb', 'left')
                     ->whereDate('transaction_detail.invoice_date', '>=', $startDate)->where('transaction_detail.invoice_date', '<=', $endDate)->groupBy('transaction_detail.wo')
                     ->unionAll($opl)->orderBy('debit', 'DESC')->get()->toArray();
 
@@ -448,5 +456,17 @@ class Files extends Controller
                 die;
             }
         }
+    }
+
+    protected function checkBalance(int $revenue, int $totalDisc, int $totalSales, int $PPN)
+    {
+        $result = false;
+        $verify = ($revenue + $totalDisc) - ($totalSales + $PPN);
+        if ($verify == 0) {
+            $result = true;
+        } else {
+            $result = false;
+        }
+        return $result;
     }
 }

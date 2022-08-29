@@ -66,8 +66,8 @@ class Transaction extends Migration
             $table->string('kode_ppn');
             $table->string('total');
             $table->string('kode_total');
-
-            $table->string('wo');
+            $table->unsignedBigInteger('id_pkb');
+            $table->foreign('id_pkb')->references('id')->on('transaction_pkb')->onDelete('cascade');
             $table->date('invoice_date');
             $table->dateTime('created_at');
             $table->dateTime('updated_at');
